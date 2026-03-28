@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
+import { runLLM } from '@/lib/llm'
 import type { ModelId } from '@/types'
 import { MODEL_OPTIONS } from '@/types'
 
@@ -45,6 +46,28 @@ export async function POST(req: NextRequest) {
     console.error('[dispatch] Supabase error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const runId = data.id
+  const cleanPrompt = prompt.trim()
+  const modelId = model as ModelId
+
+  // Run LLM in background — response is returned immediately
+  after(async () => {
+    const db = createServerClient()
+
+    await db.from('bot_runs').update({ status: 'running' }).eq('id', runId)
+
+    try {
+      const result = await runLLM(cleanPrompt, modelId)
+      await db.from('bot_runs').update({ status: 'completed', result }).eq('id', runId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      await db
+        .from('bot_runs')
+        .update({ status: 'failed', result: `Error: ${msg}` })
+        .eq('id', runId)
+    }
+  })
 
   return NextResponse.json(data, { status: 201 })
 }
