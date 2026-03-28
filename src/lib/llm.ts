@@ -1,5 +1,6 @@
 import type { ModelId } from '@/types'
 
+// Supported providers: Anthropic, OpenAI, Google
 export async function runLLM(prompt: string, model: ModelId): Promise<string> {
   if (model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6' || model === 'claude-haiku-4-5-20251001') {
     return runAnthropic(prompt, model)
